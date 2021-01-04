@@ -1,4 +1,4 @@
-const canvas = {width: 1000.0, height: 1000.0};
+const canvas = {width: null, height: null};
 
 const unloaded_images = {
     dwarf: 'dwarf.png',
@@ -41,15 +41,15 @@ function generateGoblins() {
 // global state
 const globalState = {};
 
-function bloodFromHit(image, pos, num) {
+function bloodFromHit(image, pos, num, force) {
     let bloods = [];
     for (let i = 0; i < num; i++) {
 	bloods.push({
 	    image,
 	    pos,
 	    velocity: {
-		x: Math.random() * 6 - 3,
-		y: Math.random() * 6 - 3,
+		x: Math.random() * 6 - 3 + force.x,
+		y: Math.random() * 6 - 3 + force.y,
 		z: Math.random() * 10 + 10,
 	    },
 	});
@@ -58,7 +58,14 @@ function bloodFromHit(image, pos, num) {
 }
 
 function init() {
-    const ele = document.getElementById("canvas");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const ele = document.createElement('canvas');
+    ele.width = ""+canvas.width;
+    ele.height = ""+canvas.height;
+    // const ele = document.getElementById("canvas");
+    // <canvas id="canvas" width="2000" height="2000"></div>
+    document.body.appendChild(ele);
 
     window.addEventListener("keydown", (e) => {
 	globalState.keys[e.code] = 1.0;
@@ -222,10 +229,10 @@ function draw() {
     }
     const secondsElapsed = Math.max((t - globalState.last)/10.0, 0.0001);
 
-    c.clearRect(0, 0, 1000, 1000);
+    c.clearRect(0, 0, canvas.width, canvas.height);
 
     c.fillStyle = c.createPattern(images.stoneGround, 'repeat');
-    c.fillRect(0, 0, 1000, 1000);
+    c.fillRect(0, 0, canvas.width, canvas.height);
 
     const strobe = 1 + 0.5 * Math.sin(t / 15.0);
     
@@ -263,15 +270,17 @@ function draw() {
     const goblinLen = goblins.length;
     for (let i = 0; i < goblinLen; i++) {
 	const goblin = goblins[i];
-	
-	const toDwarf = vec2d.magnitude(vec2d.subtract(dwarf.pos, goblin.pos));
-	if (toDwarf < aggroDist) {
+
+	const toDwarfVec = vec2d.subtract(dwarf.pos, goblin.pos);
+	const distToDwarf = vec2d.magnitude(toDwarfVec);
+	const toDwarfNormVec = vec2d.divideScalar(toDwarfVec, 0.5*distToDwarf);
+	if (distToDwarf < aggroDist) {
 	    if (!goblin.foundDwarf) console.log('found ya! ATTACK!!!');
 	    goblin.foundDwarf = true;
 	    if (Math.random() < 0.01) { // 1% chance of attacking per frame
 		console.log('goblin attacks! SWIPE!!');
 		dwarf.health.cur = Math.max(0, dwarf.health.cur - 2);
-		const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, 2);
+		const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, 2, toDwarfNormVec);
 		particles.push(...newBlood);
 
 	    }
@@ -280,9 +289,9 @@ function draw() {
 		// apply dwarf attack damage if it's attacking within range
 		const damage = 10 + Math.random()*6-3 + (Math.random() < 0.5 ? Math.random()*30 : 0);
 		goblin.health.cur = Math.max(0, goblin.health.cur - damage);
-		const newBlood = bloodFromHit('goblinBloodSplatter', {x: goblin.pos.x, y: goblin.pos.y, z: 100}, damage);
+		const newBlood = bloodFromHit('goblinBloodSplatter', {x: goblin.pos.x, y: goblin.pos.y, z: 100}, damage, vec2d.multiplyScalar(toDwarfNormVec, -1));
 		particles.push(...newBlood);
-		console.log(`goblin was sliced by the dwarf! Their health is now ${goblin.health.cur}`);
+		console.log(`goblin was sliced by the dwarf for ${damage} damage! Their health is now ${goblin.health.cur}`);
 	    }
 	} else {
 	    goblin.foundDwarf = false;
@@ -349,8 +358,8 @@ function draw() {
 	c.beginPath();
 	const barWidth = bar.max*2;
 	const fillWidth = Math.round(barWidth*(bar.cur / bar.max));
-	c.strokeRect(1000 - 8 - barWidth, healthBarStart + 5, barWidth+4, 20);
-	c.fillRect(1000 - 4 - fillWidth, healthBarStart + 9, fillWidth, 12);
+	c.strokeRect(canvas.width - 8 - barWidth, healthBarStart + 5, barWidth+4, 20);
+	c.fillRect(canvas.width - 4 - fillWidth, healthBarStart + 9, fillWidth, 12);
 	healthBarStart += 30;
     });
 

@@ -9,3 +9,7 @@ The idea is to have goblins to kill, maybe add some AI, etc.
 * Open a browser to the port it's serving at (`8080` for `httpserver` by default)
 
 Alternatively, you can just see it on my netlify site: https://optimistic-goldwasser-86e475.netlify.app/
+
+## Screenshot
+
+![Screenshot of goblins and dwarves demo](./screenshot.png)
