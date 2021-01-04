@@ -10,6 +10,11 @@ The idea is to have goblins to kill, maybe add some AI, etc.
 
 Alternatively, you can just see it on my netlify site: https://optimistic-goldwasser-86e475.netlify.app/
 
+## How to play
+* Use arrow keys to move the dwarf around
+* When the goblins get close, they'll attack and hurt your HP (top left bar)
+* Use Spacebar to attack goblins when they are close
+
 ## Screenshot
 
 ![Screenshot of goblins and dwarves demo](./screenshot.png)

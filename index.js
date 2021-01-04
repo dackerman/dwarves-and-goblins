@@ -25,15 +25,15 @@ function image(path){
 
 function generateGoblins() {
     let goblins = [];
-    for (let i = 0; i < 5; i++) {
-	goblins.push({
-	    health: {cur: 30, max: 30},
-	    pos: {
-		x: Math.random() * canvas.width,
-		y: Math.random() * canvas.height,
-	    },
-	    nextDestination: null,
-	});
+    for (let i = 0; i < 15; i++) {
+        goblins.push({
+            health: {cur: 30, max: 30},
+            pos: {
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+            },
+            nextDestination: null,
+        });
     }
     return goblins;
 }
@@ -44,15 +44,15 @@ const globalState = {};
 function bloodFromHit(image, pos, num, force) {
     let bloods = [];
     for (let i = 0; i < num; i++) {
-	bloods.push({
-	    image,
-	    pos,
-	    velocity: {
-		x: Math.random() * 6 - 3 + force.x,
-		y: Math.random() * 6 - 3 + force.y,
-		z: Math.random() * 10 + 10,
-	    },
-	});
+        bloods.push({
+            image,
+            pos,
+            velocity: {
+                x: Math.random() * 6 - 3 + force.x,
+                y: Math.random() * 6 - 3 + force.y,
+                z: Math.random() * 10 + 10,
+            },
+        });
     }
     return bloods;
 }
@@ -68,12 +68,12 @@ function init() {
     document.body.appendChild(ele);
 
     window.addEventListener("keydown", (e) => {
-	globalState.keys[e.code] = 1.0;
-	globalState.keysThisFrame[e.code] = 1.0;
+        globalState.keys[e.code] = 1.0;
+        globalState.keysThisFrame[e.code] = 1.0;
     }, false);
     
     window.addEventListener("keyup", (e) => {
-	delete globalState.keys[e.code];
+        delete globalState.keys[e.code];
     }, false);
     
     const c = ele.getContext('2d');
@@ -81,28 +81,29 @@ function init() {
     const images = {};
     let remaining = Object.keys(unloaded_images).length;
     Object.entries(unloaded_images).forEach(([name, path]) => {
-	images[name] = image(path);
-	images[name].addEventListener('load', () => {
-	    console.log(`loaded "${path}" as [${name}]`);
-	    if (!--remaining) {
-		console.log('images loaded');
-		const initialState = {
-		    t: 0,
-		    images,
-		    c,
-		    keys: {},
-		    keysThisFrame: {},
-		    goblins: generateGoblins(),
-		    dwarf: {
-			health: {cur: 100, max: 100},
-			pos: {x: 100, y: 100}
-		    },
-		    particles: [],
-		};
-		Object.assign(globalState, initialState);
-		draw();
-	    }
-	})
+        images[name] = image(path);
+        images[name].addEventListener('load', () => {
+            console.log(`loaded "${path}" as [${name}]`);
+            if (!--remaining) {
+                console.log('images loaded');
+                const initialState = {
+                    t: 0,
+                    images,
+                    c,
+                    keys: {},
+                    keysThisFrame: {},
+                    goblins: generateGoblins(),
+                    dwarf: {
+                        health: {cur: 100, max: 100},
+                        pos: {x: 100, y: 100}
+                    },
+                    particles: [],
+                    hits: [],
+                };
+                Object.assign(globalState, initialState);
+                draw();
+            }
+        })
     });
 }
 
@@ -122,41 +123,41 @@ function printVec(v) {
 const vec2d = (function() {
     const vec2d = {};
     vec2d.add = (a, b) => ({
-	x: a.x + b.x,
-	y: a.y + b.y,
+        x: a.x + b.x,
+        y: a.y + b.y,
     });
     
     vec2d.subtract = (a, b) => ({
-	x: a.x - b.x,
-	y: a.y - b.y,
+        x: a.x - b.x,
+        y: a.y - b.y,
     });
 
     vec2d.multiply = (a, b) => ({
-	x: a.x * b.x,
-	y: a.y * b.y,
+        x: a.x * b.x,
+        y: a.y * b.y,
     });
 
     vec2d.divide = (a, b) => ({
-	x: a.x / b.x,
-	y: a.y / b.y,
+        x: a.x / b.x,
+        y: a.y / b.y,
     });
 
     vec2d.multiplyScalar = (a, scalar) => ({
-	x: a.x * scalar,
-	y: a.y * scalar,
+        x: a.x * scalar,
+        y: a.y * scalar,
     });
 
     vec2d.divideScalar = (a, scalar) => ({
-	x: a.x / scalar,
-	y: a.y / scalar,
+        x: a.x / scalar,
+        y: a.y / scalar,
     });
 
     vec2d.magnitude = v => Math.sqrt(v.x*v.x + v.y*v.y);
 
     vec2d.towards = (vstart, vend, magnitude) => {
-	const vdiff = vec2d.subtract(vend, vstart);
-	const vunit = vec2d.divideScalar(vdiff, vec2d.magnitude(vdiff));
-	return vec2d.multiplyScalar(vunit, magnitude);
+        const vdiff = vec2d.subtract(vend, vstart);
+        const vunit = vec2d.divideScalar(vdiff, vec2d.magnitude(vdiff));
+        return vec2d.multiplyScalar(vunit, magnitude);
     }      
 
     Object.seal(vec2d);
@@ -166,47 +167,47 @@ const vec2d = (function() {
 const vec3d = (function() {
     const vec3d = {};
     vec3d.add = (a, b) => ({
-	x: a.x + b.x,
-	y: a.y + b.y,
-	z: a.z + b.z,
+        x: a.x + b.x,
+        y: a.y + b.y,
+        z: a.z + b.z,
     });
     
     vec3d.subtract = (a, b) => ({
-	x: a.x - b.x,
-	y: a.y - b.y,
-	z: a.z - b.z,
+        x: a.x - b.x,
+        y: a.y - b.y,
+        z: a.z - b.z,
     });
 
     vec3d.multiply = (a, b) => ({
-	x: a.x * b.x,
-	y: a.y * b.y,
-	z: a.z * b.z,
+        x: a.x * b.x,
+        y: a.y * b.y,
+        z: a.z * b.z,
     });
 
     vec3d.divide = (a, b) => ({
-	x: a.x / b.x,
-	y: a.y / b.y,
-	z: a.z / b.z,
+        x: a.x / b.x,
+        y: a.y / b.y,
+        z: a.z / b.z,
     });
 
     vec3d.multiplyScalar = (a, scalar) => ({
-	x: a.x * scalar,
-	y: a.y * scalar,
-	z: a.z * scalar,
+        x: a.x * scalar,
+        y: a.y * scalar,
+        z: a.z * scalar,
     });
 
     vec3d.divideScalar = (a, scalar) => ({
-	x: a.x / scalar,
-	y: a.y / scalar,
-	z: a.z / scalar,
+        x: a.x / scalar,
+        y: a.y / scalar,
+        z: a.z / scalar,
     });
 
     vec3d.magnitude = v => Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
 
     vec3d.towards = (vstart, vend, magnitude) => {
-	const vdiff = vec3d.subtract(vend, vstart);
-	const vunit = vec3d.divideScalar(vdiff, vec3d.magnitude(vdiff));
-	return vec3d.multiplyScalar(vunit, magnitude);
+        const vdiff = vec3d.subtract(vend, vstart);
+        const vunit = vec3d.divideScalar(vdiff, vec3d.magnitude(vdiff));
+        return vec3d.multiplyScalar(vunit, magnitude);
     }
 
     Object.seal(vec3d);
@@ -222,12 +223,12 @@ const halfDwarfDim = {x: 100, y: 100};
 const aggroDist = 150;
 
 function draw() {
-    const {t, images, c, keys, goblins, dwarf, particles} = globalState;
+    const {t, images, c, keys, goblins, dwarf, particles, hits} = globalState;
     if (globalState.start === undefined) {
-	globalState.start = t;
-	globalState.last = t;
+        globalState.start = t;
+        globalState.last = t;
     }
-    const secondsElapsed = Math.max((t - globalState.last)/10.0, 0.0001);
+    const frameTimeSeconds = Math.max((t - globalState.last)/10.0, 0.0001);
 
     c.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -244,98 +245,101 @@ function draw() {
     const dwarfAttacked = keyPress('Space');
 
     if (dwarfAttacked) {
-	c.fillStyle = 'white';
-	c.arc(dwarf.pos.x, dwarf.pos.y, aggroDist, 0, 2 * Math.PI);
-	c.fill();
+        c.fillStyle = 'white';
+        c.arc(dwarf.pos.x, dwarf.pos.y, aggroDist, 0, 2 * Math.PI);
+        c.fill();
     }
 
-    c.font = '16px monospace';
+    c.font = '24px monospace';
 
     
     // Draw particles
     const numParticles = particles.length;
-    const zchange = 1 * secondsElapsed;
+    const zchange = 1 * frameTimeSeconds;
     for (let i = 0; i < numParticles; i++) {
-	const splatter = particles[i];
+        const splatter = particles[i];
 
-	if (splatter.pos.z > 0) {
-	    splatter.velocity.z -= zchange;
-	    splatter.pos = vec3d.add(splatter.pos, vec3d.multiplyScalar(splatter.velocity, secondsElapsed));
-	}
-	
-	c.drawImage(images[splatter.image], splatter.pos.x, splatter.pos.y - splatter.pos.z/2.0, 105 , 68);
+        if (splatter.pos.z > 0) {
+            splatter.velocity.z -= zchange;
+            splatter.pos = vec3d.add(splatter.pos, vec3d.multiplyScalar(splatter.velocity, frameTimeSeconds));
+        }
+        
+        c.drawImage(images[splatter.image], splatter.pos.x, splatter.pos.y - splatter.pos.z/2.0, 105 , 68);
     }
 
     // Draw goblins
     const goblinLen = goblins.length;
     for (let i = 0; i < goblinLen; i++) {
-	const goblin = goblins[i];
+        const goblin = goblins[i];
 
-	const toDwarfVec = vec2d.subtract(dwarf.pos, goblin.pos);
-	const distToDwarf = vec2d.magnitude(toDwarfVec);
-	const toDwarfNormVec = vec2d.divideScalar(toDwarfVec, 0.5*distToDwarf);
-	if (distToDwarf < aggroDist) {
-	    if (!goblin.foundDwarf) console.log('found ya! ATTACK!!!');
-	    goblin.foundDwarf = true;
-	    if (Math.random() < 0.01) { // 1% chance of attacking per frame
-		console.log('goblin attacks! SWIPE!!');
-		dwarf.health.cur = Math.max(0, dwarf.health.cur - 2);
-		const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, 2, toDwarfNormVec);
-		particles.push(...newBlood);
+        const toDwarfVec = vec2d.subtract(dwarf.pos, goblin.pos);
+        const distToDwarf = vec2d.magnitude(toDwarfVec);
+        const toDwarfNormVec = vec2d.divideScalar(toDwarfVec, 0.5*distToDwarf);
+        if (distToDwarf < aggroDist) {
+            if (!goblin.foundDwarf) console.log('found ya! ATTACK!!!');
+            goblin.foundDwarf = true;
+            if (Math.random() < 0.01) { // 1% chance of attacking per frame
+                console.log('goblin attacks! SWIPE!!');
+                const damage = 2 + (Math.random() < 0.5 ? Math.random()*10 : 0);
+                dwarf.health.cur = Math.max(0, dwarf.health.cur - damage);
+                const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, damage, toDwarfNormVec);
+                particles.push(...newBlood);
+                hits.push({at: t, pos: {x: dwarf.pos.x, y: dwarf.pos.y}, velocity: toDwarfNormVec, damage});
+            }
 
-	    }
+            if (dwarfAttacked) {
+                // apply dwarf attack damage if it's attacking within range
+                const damage = 10 + Math.random()*6-3 + (Math.random() < 0.5 ? Math.random()*30 : 0);
+                goblin.health.cur = Math.max(0, goblin.health.cur - damage);
+                const velocity = vec2d.multiplyScalar(toDwarfNormVec, -1);
+                const newBlood = bloodFromHit('goblinBloodSplatter', {x: goblin.pos.x, y: goblin.pos.y, z: 100}, damage, velocity);
+                particles.push(...newBlood);
+                hits.push({at: t, pos: {x: goblin.pos.x, y: goblin.pos.y}, velocity, damage});
+                console.log(`goblin was sliced by the dwarf for ${damage} damage! Their health is now ${goblin.health.cur}`);
+            }
+        } else {
+            goblin.foundDwarf = false;
+        }
 
-	    if (dwarfAttacked) {
-		// apply dwarf attack damage if it's attacking within range
-		const damage = 10 + Math.random()*6-3 + (Math.random() < 0.5 ? Math.random()*30 : 0);
-		goblin.health.cur = Math.max(0, goblin.health.cur - damage);
-		const newBlood = bloodFromHit('goblinBloodSplatter', {x: goblin.pos.x, y: goblin.pos.y, z: 100}, damage, vec2d.multiplyScalar(toDwarfNormVec, -1));
-		particles.push(...newBlood);
-		console.log(`goblin was sliced by the dwarf for ${damage} damage! Their health is now ${goblin.health.cur}`);
-	    }
-	} else {
-	    goblin.foundDwarf = false;
-	}
 
+        if (!goblin.foundDwarf) {
+            if (goblin.nextDestination) {
+                const dist = vec2d.magnitude(vec2d.subtract(goblin.nextDestination, goblin.pos));
+                // c.lineWidth = 1;
+                // const color = Math.round(205 + 50*strobe);
+                // c.strokeStyle = `rgb(${color},${color},${color})`;
+                // c.strokeText(''+Math.round(dist), goblin.nextDestination.x + 5, goblin.nextDestination.y);
+                if (dist < 10) {
+                    goblin.nextDestination = null;
+                }
+            }
+            if (!goblin.nextDestination) {
+                goblin.nextDestination = {
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,   
+                };
+            }
+            const travel = vec2d.towards(goblin.pos, goblin.nextDestination, 0.75);
+            goblin.pos = vec2d.add(goblin.pos, travel);
+            
+            // c.strokeStyle = `rgb(0, ${Math.round(255*strobe)}, 0)`;
+            // c.lineWidth = 3;
+            // c.beginPath();
+            // c.moveTo(goblin.pos.x, goblin.pos.y);
+            // c.lineTo(goblin.nextDestination.x, goblin.nextDestination.y);
+            // c.stroke();
+        }
 
-	if (!goblin.foundDwarf) {
-	    if (goblin.nextDestination) {
-		const dist = vec2d.magnitude(vec2d.subtract(goblin.nextDestination, goblin.pos));
-		// c.lineWidth = 1;
-		// const color = Math.round(205 + 50*strobe);
-		// c.strokeStyle = `rgb(${color},${color},${color})`;
-		// c.strokeText(''+Math.round(dist), goblin.nextDestination.x + 5, goblin.nextDestination.y);
-		if (dist < 10) {
-		    goblin.nextDestination = null;
-		}
-	    }
-	    if (!goblin.nextDestination) {
-		goblin.nextDestination = {
-		    x: Math.random() * canvas.width,
-		    y: Math.random() * canvas.height,	
-		};
-	    }
-	    const travel = vec2d.towards(goblin.pos, goblin.nextDestination, 0.75);
-	    goblin.pos = vec2d.add(goblin.pos, travel);
-	    
-	    // c.strokeStyle = `rgb(0, ${Math.round(255*strobe)}, 0)`;
-	    // c.lineWidth = 3;
-	    // c.beginPath();
-	    // c.moveTo(goblin.pos.x, goblin.pos.y);
-	    // c.lineTo(goblin.nextDestination.x, goblin.nextDestination.y);
-	    // c.stroke();
-	}
-
-	const goblinTopLeft = vec2d.subtract(goblin.pos, halfGoblinDim);
-	const goblinImg = goblin.health.cur < goblin.health.max ? images.goblinHurt : images.goblin;
-	c.drawImage(goblinImg, goblinTopLeft.x, goblinTopLeft.y);
+        const goblinTopLeft = vec2d.subtract(goblin.pos, halfGoblinDim);
+        const goblinImg = goblin.health.cur < goblin.health.max ? images.goblinHurt : images.goblin;
+        c.drawImage(goblinImg, goblinTopLeft.x, goblinTopLeft.y);
     }
 
     // Delete dead goblins
     for (let i = goblins.length - 1; i >= 0; i--) {
-	if (!goblins[i].health.cur) {
-	    goblins.splice(i, 1);
-	}
+        if (!goblins[i].health.cur) {
+            goblins.splice(i, 1);
+        }
     }
 
     // Draw Dwarf
@@ -346,28 +350,45 @@ function draw() {
     // c.strokeStyle = 'red';
     // c.arc(dwarf.pos.x, dwarf.pos.y, aggroDist, 0, 2 * Math.PI);
     // c.stroke();
-    
-    // draw healthbar
-    const healthBars = [dwarf.health].concat(goblins.map(g => g.health));
 
+    // Draw damage texts
+    const hitLifetime = 500;
+    hits.forEach(hit => {
+        hit.pos.x += hit.velocity.x * frameTimeSeconds;
+        hit.pos.y += hit.velocity.y * frameTimeSeconds;
+        const age = (t - hit.at) / hitLifetime;
+        const col = 255 - 255*age;
+        c.lineWidth = 1;
+        c.fillStyle = `rgb(255,255,${col})`;
+        c.fillText('' + Math.round(hit.damage), hit.pos.x, hit.pos.y+Math.sin(t/50.0)*10);
+    });
+
+    for (let i = hits.length - 1; i >= 0; i--) {
+        if (t - hits[i].at > hitLifetime) {
+            hits.splice(i, 1);
+        }
+    }
+    
+    // draw healthbars
+    const healthBars = [dwarf.health].concat(goblins.map(g => g.health));
     c.strokeStyle = 'black';
     c.lineWidth = 4;
     c.fillStyle = 'red';
     let healthBarStart = 0;
     healthBars.forEach(bar => {
-	c.beginPath();
-	const barWidth = bar.max*2;
-	const fillWidth = Math.round(barWidth*(bar.cur / bar.max));
-	c.strokeRect(canvas.width - 8 - barWidth, healthBarStart + 5, barWidth+4, 20);
-	c.fillRect(canvas.width - 4 - fillWidth, healthBarStart + 9, fillWidth, 12);
-	healthBarStart += 30;
+        c.beginPath();
+        const barWidth = bar.max*2;
+        const fillWidth = Math.round(barWidth*(bar.cur / bar.max));
+        c.strokeRect(canvas.width - 8 - barWidth, healthBarStart + 5, barWidth+4, 20);
+        c.fillRect(canvas.width - 4 - fillWidth, healthBarStart + 9, fillWidth, 12);
+        healthBarStart += 30;
     });
 
     globalState.keysThisFrame = {};
     
     window.requestAnimationFrame((t) => {
-	globalState.last = globalState.t;
-	globalState.t = t;
-	draw();
+        globalState.last = globalState.t;
+        globalState.t = t;
+        draw();
     });
 }
