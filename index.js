@@ -11,6 +11,20 @@ const unloaded_images = {
     health: 'health.png',
 };
 
+const unloaded_sounds = {
+    goblinHit: 'goblin-hit.wav',
+    goblinDie: 'goblin-die.wav',
+    goblinWin: 'goblin-win.wav',
+    axeHit: 'axe-hit.wav',
+    axeWhiff: 'axe-whiff.wav',
+    dwarfOuch: 'dwarf-ouch.wav',
+    footsteps: 'footsteps.wav',
+    clang: 'clang.mp3',
+    glug: 'glug.mp3',
+    medievalMusic: 'medieval-music.mp3',
+    cave: 'cave.wav',
+};
+
 window.addEventListener('load', function() {
     console.log('window loaded');
     init();
@@ -55,7 +69,7 @@ function genHealthPotions() {
 }
 
 // global state
-const globalState = {};
+const globalState = {keys: {}};
 
 function bloodFromHit(image, pos, num, force) {
     let bloods = [];
@@ -79,8 +93,6 @@ function init() {
     const ele = document.createElement('canvas');
     ele.width = ""+canvas.width;
     ele.height = ""+canvas.height;
-    // const ele = document.getElementById("canvas");
-    // <canvas id="canvas" width="2000" height="2000"></div>
     document.body.appendChild(ele);
 
     window.addEventListener("keydown", (e) => {
@@ -91,38 +103,86 @@ function init() {
     window.addEventListener("keyup", (e) => {
         delete globalState.keys[e.code];
     }, false);
-    
+
     const c = ele.getContext('2d');
 
     const images = {};
-    let remaining = Object.keys(unloaded_images).length;
+    let remaining = Object.keys(unloaded_images).length + Object.keys(unloaded_sounds).length;
     Object.entries(unloaded_images).forEach(([name, path]) => {
         images[name] = image(path);
         images[name].addEventListener('load', () => {
-            console.log(`loaded "${path}" as [${name}]`);
+            console.log(`IMAGE: loaded "${path}" as [${name}]`);
             if (!--remaining) {
-                console.log('images loaded');
-                const initialState = {
-                    t: 0,
-                    images,
-                    c,
-                    keys: {},
-                    keysThisFrame: {},
-                    goblins: generateGoblins(),
-                    dwarf: {
-                        stamina: {color: 'green', cur: 100, max: 100},
-                        health: {color: 'red', cur: 100, max: 100},
-                        pos: {x: 100, y: 100}
-                    },
-                    particles: [],
-                    hits: [],
-                    healthPotions: genHealthPotions(),
-                };
-                Object.assign(globalState, initialState);
-                draw();
+                startDrawing();
             }
         })
     });
+
+    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    const sounds = Object.fromEntries(Object.entries(unloaded_sounds).map(([name, path]) => {
+        const sound = {};
+        fetch(path).then(response => response.arrayBuffer()).then(buffer => {
+            audioCtx.decodeAudioData(buffer, decodedData => {
+                sound.buffer = decodedData;
+                console.log(`SOUND: loaded ${path} as [${name}]`);
+                if (!--remaining) {
+                    startDrawing();
+                }
+            });
+        });
+        
+        return [name, sound];
+    }));
+
+    const soundPlayer = (function() {
+        const pool = [];
+        const play = (soundName, opts={}) => {
+            const source = audioCtx.createBufferSource();
+            source.buffer = sounds[soundName].buffer;
+	    if (opts.volume) {
+		const gainNode = audioCtx.createGain();
+		gainNode.gain.value = opts.volume;
+		gainNode.connect(audioCtx.destination);
+		source.connect(gainNode);
+	    } else {
+		source.connect(audioCtx.destination);		
+	    }
+	    
+	    if (opts.loop) source.loop = true;
+            source.start(0);
+	    return source;
+        };
+        return {
+            play,
+        };
+    })();
+
+    function startDrawing() {
+        console.log('everything loaded');
+	// soundPlayer.play('medievalMusic', {volume: 0.1, loop: true});
+	soundPlayer.play('cave', {volume: 0.1, loop: true});
+        const initialState = {
+            t: 0,
+            images,
+            sounds,
+            soundPlayer,
+            c,
+            keys: {},
+            keysThisFrame: {},
+            goblins: generateGoblins(),
+            dwarf: {
+                stamina: {color: 'green', cur: 100, max: 100},
+                health: {color: 'red', cur: 100, max: 100},
+                pos: {x: 100, y: 100}
+            },
+            particles: [],
+            hits: [],
+            healthPotions: genHealthPotions(),
+        };
+        Object.assign(globalState, initialState);
+        draw();        
+    }
 }
 
 function key(name) {
@@ -243,7 +303,7 @@ const halfDwarfDim = {x: 100, y: 100};
 const aggroDist = 150;
 
 function draw() {
-    const {t, images, c, keys, goblins, dwarf, particles, hits, healthPotions} = globalState;
+    const {t, images, sounds, soundPlayer, c, keys, goblins, dwarf, particles, hits, healthPotions} = globalState;
     if (globalState.start === undefined) {
         globalState.start = t;
         globalState.last = t;
@@ -261,11 +321,38 @@ function draw() {
     const yDir = key('ArrowDown') - key('ArrowUp');
     const startingDwarfHealth = dwarf.health.cur;
 
-    dwarf.stamina.cur += 0.5;
-    dwarf.stamina.cur -= 0.1 * (Math.abs(xDir)+Math.abs(yDir));
+    const walking = Math.abs(xDir)+Math.abs(yDir) && !dwarf.knockedBack;
 
-    if (dwarf.stamina.cur > 0) {
+    dwarf.stamina.cur += 0.5;
+    dwarf.stamina.cur -= 0.1 * walking;
+
+    if (walking) {
+	if (!dwarf.walkingSound) {
+	    dwarf.walkingSound = soundPlayer.play('footsteps', {loop: true});
+	}
+    } else {
+	if (dwarf.walkingSound) {
+	    dwarf.walkingSound.stop();
+	    delete dwarf.walkingSound;
+	}
+    }
+
+    if (dwarf.stamina.cur > 0 && walking) {
         dwarf.pos = vec2d.add(dwarf.pos, {x: 5*xDir, y: 5*yDir});
+    }
+
+    if (dwarf.knockedBack) {
+	console.log('knockedback');
+	console.log(dwarf.pos);
+	console.log(dwarf.knockedBack);
+	dwarf.knockedBack.velocity.z -= frameTimeSeconds;
+	dwarf.knockedBack.pos = vec3d.add(dwarf.knockedBack.pos, vec3d.multiplyScalar(dwarf.knockedBack.velocity, frameTimeSeconds));
+	dwarf.pos = {x: dwarf.knockedBack.pos.x, y: dwarf.knockedBack.pos.y - dwarf.knockedBack.pos.z/2.0};
+	console.log(dwarf.pos);
+	console.log(dwarf.knockedBack);
+	if (dwarf.knockedBack.pos.z < 0) { // stop physics when dwarf hits the ground
+	    delete dwarf.knockedBack;
+	}
     }
 
     const dwarfAttacked = keyPress('Space') && dwarf.stamina.cur > 20;
@@ -290,12 +377,13 @@ function draw() {
 
     // Render and use health potions    
     healthPotions.forEach(potion => {
-        if (vec2d.distance(dwarf.pos, potion.pos) < 20) {
+        if (dwarf.health.cur < dwarf.health.max && vec2d.distance(dwarf.pos, potion.pos) < aggroDist) {
             console.log(`got health of ${potion.amount}!!`);
-            dwarf.health.cur += potion.amount;
+            dwarf.health.cur = Math.min(dwarf.health.max, dwarf.health.cur + potion.amount);
             potion.taken = true;
+	    soundPlayer.play('glug');
         }
-        c.drawImage(images.health, potion.pos.x, potion.pos.y);
+        c.drawImage(images.health, potion.pos.x - images.health.width/2.0, potion.pos.y - images.health.height/2.0);
     });
 
     // delete taken health potions
@@ -331,18 +419,28 @@ function draw() {
         const toDwarfVec = vec2d.subtract(dwarf.pos, goblin.pos);
         const distToDwarf = vec2d.magnitude(toDwarfVec);
         const toDwarfNormVec = vec2d.divideScalar(toDwarfVec, 0.5*distToDwarf);
+        const damageMultiplier = Math.max(1, goblin.health.max/30.0);
         if (distToDwarf < aggroDist) {
             goblin.foundDwarf = true;
             if (Math.random() < 0.01 && dwarf.health.cur > 0) { // 1% chance of attacking per frame
-                const damageMultiplier = Math.max(1, goblin.health.max/30.0);
-                let damage = 2 + (Math.random() < 0.5 ? Math.random()*10 : 0) + damageMultiplier > 1 ? 50*damageMultiplier : 0;
-                damage *= dwarfBlocked ? 0.01 : 1;
-                console.log(`goblin attacks! SWIPE for ${damage} damage!!`);
+                let damage = 2*damageMultiplier*damageMultiplier + (Math.random() < 0.5 ? Math.random()*10 : 0);
+                const blockAmount = dwarfBlocked ? Math.min(100, damage*0.9) : 0;
+                damage -= blockAmount;
+                console.log(`goblin attacks! SWIPE for ${damage} damage!! Blocked ${blockAmount}`);
                 dwarf.health.cur = Math.max(0, dwarf.health.cur - damage);
                 const vecMultiplier = Math.min(5, Math.max(1, damage/15.0));
-                const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, damage, vec2d.multiplyScalar(toDwarfNormVec, vecMultiplier));
+		const multipliedVec = vec2d.multiplyScalar(toDwarfNormVec, vecMultiplier);
+                const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, damage, multipliedVec);
                 particles.push(...newBlood);
                 hits.push({at: t, pos: {x: dwarf.pos.x, y: dwarf.pos.y}, velocity: toDwarfNormVec, damage});
+		if (dwarfBlocked) {
+		    soundPlayer.play('clang');
+		} else {
+		    soundPlayer.play('dwarfOuch');
+		    soundPlayer.play('axeHit');
+		    const knockedbackValue = {pos: {x: dwarf.pos.x, y: dwarf.pos.y, z: 100}, velocity: {x: multipliedVec.x, y: multipliedVec.y, z: 5}};
+		    dwarf.knockedBack = knockedbackValue;
+		}
             }
 
             if (dwarfAttacked) {
@@ -395,15 +493,22 @@ function draw() {
         const goblinTopLeft = vec2d.subtract(goblin.pos, vec2d.multiplyScalar(halfGoblinDim, size));
         const goblinImg = goblin.health.cur < goblin.health.max ? images.goblinHurt : images.goblin;
         c.drawImage(goblinImg, goblinTopLeft.x, goblinTopLeft.y, goblinDim.x*size, goblinDim.y*size);
+        c.fillStyle = 'white';
+        c.fillText(`h:${Math.round(goblin.health.cur)} d:${Math.round(100*2*damageMultiplier*damageMultiplier)/100.0}`, goblin.pos.x, goblin.pos.y);
     }
 
     if (hitAGoblin) {
         dwarf.lastHit = t;
+        soundPlayer.play('goblinHit');
+        soundPlayer.play('axeHit');
+    } else if (dwarfAttacked) {
+        soundPlayer.play('axeWhiff');
     }
 
     // Delete dead goblins
     for (let i = goblins.length - 1; i >= 0; i--) {
         if (!goblins[i].health.cur) {
+	    soundPlayer.play('goblinDie');
             goblins.splice(i, 1);
         }
     }
@@ -412,10 +517,10 @@ function draw() {
     const dwarfTopLeft = vec2d.subtract(dwarf.pos, halfDwarfDim);
     const dwarfImg = dwarf.health.cur <= 0 || startingDwarfHealth > dwarf.health.cur ? images.dwarfHurt : images.dwarf;
     c.drawImage(dwarfImg, dwarfTopLeft.x, dwarfTopLeft.y);
-    // c.beginPath();
-    // c.strokeStyle = 'red';
-    // c.arc(dwarf.pos.x, dwarf.pos.y, aggroDist, 0, 2 * Math.PI);
-    // c.stroke();
+
+    if (startingDwarfHealth > 0 && dwarf.health.cur <= 0) {
+	soundPlayer.play('goblinWin');
+    }
 
     // Draw damage texts
     const hitLifetime = 1000;
