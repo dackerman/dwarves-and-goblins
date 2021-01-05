@@ -8,6 +8,7 @@ const unloaded_images = {
     stoneGround: 'stone-ground.jpg',
     bloodSplatter: 'blood-splatter.png',
     goblinBloodSplatter: 'goblin-blood-splatter.png',
+    health: 'health.png',
 };
 
 window.addEventListener('load', function() {
@@ -25,9 +26,10 @@ function image(path){
 
 function generateGoblins() {
     let goblins = [];
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 5; i++) {
+        const health = 30 + Math.random() * Math.random()*80 + (Math.random() < 0.1 ? 100+Math.random()*100 : 0);
         goblins.push({
-            health: {cur: 30, max: 30},
+            health: {color: 'red', cur: health, max: health},
             pos: {
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
@@ -36,6 +38,20 @@ function generateGoblins() {
         });
     }
     return goblins;
+}
+
+function genHealthPotions() {
+    const potions = [];
+    for (let i = 0; i < 10; i++) {
+        potions.push({
+            amount: 50,
+            pos: {
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+            }
+        });
+    }
+    return potions;
 }
 
 // global state
@@ -94,11 +110,13 @@ function init() {
                     keysThisFrame: {},
                     goblins: generateGoblins(),
                     dwarf: {
-                        health: {cur: 100, max: 100},
+                        stamina: {color: 'green', cur: 100, max: 100},
+                        health: {color: 'red', cur: 100, max: 100},
                         pos: {x: 100, y: 100}
                     },
                     particles: [],
                     hits: [],
+                    healthPotions: genHealthPotions(),
                 };
                 Object.assign(globalState, initialState);
                 draw();
@@ -158,7 +176,9 @@ const vec2d = (function() {
         const vdiff = vec2d.subtract(vend, vstart);
         const vunit = vec2d.divideScalar(vdiff, vec2d.magnitude(vdiff));
         return vec2d.multiplyScalar(vunit, magnitude);
-    }      
+    }
+
+    vec2d.distance = (a, b) => vec2d.magnitude(vec2d.subtract(b, a));
 
     Object.seal(vec2d);
     return vec2d;
@@ -223,7 +243,7 @@ const halfDwarfDim = {x: 100, y: 100};
 const aggroDist = 150;
 
 function draw() {
-    const {t, images, c, keys, goblins, dwarf, particles, hits} = globalState;
+    const {t, images, c, keys, goblins, dwarf, particles, hits, healthPotions} = globalState;
     if (globalState.start === undefined) {
         globalState.start = t;
         globalState.last = t;
@@ -239,21 +259,54 @@ function draw() {
     
     const xDir = key('ArrowRight') - key('ArrowLeft');
     const yDir = key('ArrowDown') - key('ArrowUp');
-    dwarf.pos = vec2d.add(dwarf.pos, {x: 5*xDir, y: 5*yDir});
     const startingDwarfHealth = dwarf.health.cur;
 
-    const dwarfAttacked = keyPress('Space');
+    dwarf.stamina.cur += 0.5;
+    dwarf.stamina.cur -= 0.1 * (Math.abs(xDir)+Math.abs(yDir));
+
+    if (dwarf.stamina.cur > 0) {
+        dwarf.pos = vec2d.add(dwarf.pos, {x: 5*xDir, y: 5*yDir});
+    }
+
+    const dwarfAttacked = keyPress('Space') && dwarf.stamina.cur > 20;
+    const dwarfBlocked = key('Backspace') && !dwarfAttacked && dwarf.stamina.cur > 10;
 
     if (dwarfAttacked) {
+        dwarf.stamina.cur -= 20;
         c.fillStyle = 'white';
         c.arc(dwarf.pos.x, dwarf.pos.y, aggroDist, 0, 2 * Math.PI);
         c.fill();
     }
+    if (dwarfBlocked) {
+        c.strokeStyle = 'white';
+        c.lineWidth = 2;
+        c.arc(dwarf.pos.x, dwarf.pos.y, aggroDist*1.2, 0, 2 * Math.PI);
+        c.stroke();
+        dwarf.stamina.cur -= 1;
+    }
+    dwarf.stamina.cur = Math.max(0, Math.min(dwarf.stamina.max, dwarf.stamina.cur));
 
     c.font = '24px monospace';
 
+    // Render and use health potions    
+    healthPotions.forEach(potion => {
+        if (vec2d.distance(dwarf.pos, potion.pos) < 20) {
+            console.log(`got health of ${potion.amount}!!`);
+            dwarf.health.cur += potion.amount;
+            potion.taken = true;
+        }
+        c.drawImage(images.health, potion.pos.x, potion.pos.y);
+    });
+
+    // delete taken health potions
+    for (let i = healthPotions.length - 1; i >= 0; i--) {
+        if (healthPotions[i].taken) {
+            healthPotions.splice(i, 1);
+        }
+    }
     
     // Draw particles
+    c.globalAlpha = 0.3;
     const numParticles = particles.length;
     const zchange = 1 * frameTimeSeconds;
     for (let i = 0; i < numParticles; i++) {
@@ -266,9 +319,12 @@ function draw() {
         
         c.drawImage(images[splatter.image], splatter.pos.x, splatter.pos.y - splatter.pos.z/2.0, 105 , 68);
     }
+    c.globalAlpha = 1;
+    
 
     // Draw goblins
     const goblinLen = goblins.length;
+    let hitAGoblin = false;
     for (let i = 0; i < goblinLen; i++) {
         const goblin = goblins[i];
 
@@ -276,25 +332,30 @@ function draw() {
         const distToDwarf = vec2d.magnitude(toDwarfVec);
         const toDwarfNormVec = vec2d.divideScalar(toDwarfVec, 0.5*distToDwarf);
         if (distToDwarf < aggroDist) {
-            if (!goblin.foundDwarf) console.log('found ya! ATTACK!!!');
             goblin.foundDwarf = true;
-            if (Math.random() < 0.01) { // 1% chance of attacking per frame
-                console.log('goblin attacks! SWIPE!!');
-                const damage = 2 + (Math.random() < 0.5 ? Math.random()*10 : 0);
+            if (Math.random() < 0.01 && dwarf.health.cur > 0) { // 1% chance of attacking per frame
+                const damageMultiplier = Math.max(1, goblin.health.max/30.0);
+                let damage = 2 + (Math.random() < 0.5 ? Math.random()*10 : 0) + damageMultiplier > 1 ? 50*damageMultiplier : 0;
+                damage *= dwarfBlocked ? 0.01 : 1;
+                console.log(`goblin attacks! SWIPE for ${damage} damage!!`);
                 dwarf.health.cur = Math.max(0, dwarf.health.cur - damage);
-                const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, damage, toDwarfNormVec);
+                const vecMultiplier = Math.min(5, Math.max(1, damage/15.0));
+                const newBlood = bloodFromHit('bloodSplatter', {x: dwarf.pos.x, y: dwarf.pos.y, z: 200}, damage, vec2d.multiplyScalar(toDwarfNormVec, vecMultiplier));
                 particles.push(...newBlood);
                 hits.push({at: t, pos: {x: dwarf.pos.x, y: dwarf.pos.y}, velocity: toDwarfNormVec, damage});
             }
 
             if (dwarfAttacked) {
                 // apply dwarf attack damage if it's attacking within range
-                const damage = 10 + Math.random()*6-3 + (Math.random() < 0.5 ? Math.random()*30 : 0);
+                const damage = Math.min(goblin.health.cur, 5 + (10 + Math.random()*30 + (Math.random() < 0.5 ? Math.random()*30 : 0)) * Math.min((t - (dwarf.lastHit||t))/1000.0, 1));
                 goblin.health.cur = Math.max(0, goblin.health.cur - damage);
-                const velocity = vec2d.multiplyScalar(toDwarfNormVec, -1);
+                const vecMultiplier = Math.max(1, damage/15.0);
+                console.log(vecMultiplier);
+                const velocity = vec2d.multiplyScalar(toDwarfNormVec, -1 * vecMultiplier);
                 const newBlood = bloodFromHit('goblinBloodSplatter', {x: goblin.pos.x, y: goblin.pos.y, z: 100}, damage, velocity);
                 particles.push(...newBlood);
                 hits.push({at: t, pos: {x: goblin.pos.x, y: goblin.pos.y}, velocity, damage});
+                hitAGoblin = true;
                 console.log(`goblin was sliced by the dwarf for ${damage} damage! Their health is now ${goblin.health.cur}`);
             }
         } else {
@@ -330,9 +391,14 @@ function draw() {
             // c.stroke();
         }
 
-        const goblinTopLeft = vec2d.subtract(goblin.pos, halfGoblinDim);
+        const size = 1 + 0.5 * (goblin.health.max / 30.0 - 1.0);
+        const goblinTopLeft = vec2d.subtract(goblin.pos, vec2d.multiplyScalar(halfGoblinDim, size));
         const goblinImg = goblin.health.cur < goblin.health.max ? images.goblinHurt : images.goblin;
-        c.drawImage(goblinImg, goblinTopLeft.x, goblinTopLeft.y);
+        c.drawImage(goblinImg, goblinTopLeft.x, goblinTopLeft.y, goblinDim.x*size, goblinDim.y*size);
+    }
+
+    if (hitAGoblin) {
+        dwarf.lastHit = t;
     }
 
     // Delete dead goblins
@@ -352,10 +418,10 @@ function draw() {
     // c.stroke();
 
     // Draw damage texts
-    const hitLifetime = 500;
+    const hitLifetime = 1000;
     hits.forEach(hit => {
-        hit.pos.x += hit.velocity.x * frameTimeSeconds;
-        hit.pos.y += hit.velocity.y * frameTimeSeconds;
+        hit.pos.x += hit.velocity.x * frameTimeSeconds * 0.5;
+        hit.pos.y += hit.velocity.y * frameTimeSeconds * 0.5;
         const age = (t - hit.at) / hitLifetime;
         const col = 255 - 255*age;
         c.lineWidth = 1;
@@ -368,14 +434,15 @@ function draw() {
             hits.splice(i, 1);
         }
     }
+
     
     // draw healthbars
-    const healthBars = [dwarf.health].concat(goblins.map(g => g.health));
+    const healthBars = [dwarf.health, dwarf.stamina].concat(goblins.map(g => g.health));
     c.strokeStyle = 'black';
     c.lineWidth = 4;
-    c.fillStyle = 'red';
     let healthBarStart = 0;
     healthBars.forEach(bar => {
+        c.fillStyle = bar.color;
         c.beginPath();
         const barWidth = bar.max*2;
         const fillWidth = Math.round(barWidth*(bar.cur / bar.max));
