@@ -8,7 +8,7 @@ The idea is to have goblins to kill, maybe add some AI, etc.
 * Just run an HTTP server in the main directory, like node's `httpserver`.
 * Open a browser to the port it's serving at (`8080` for `httpserver` by default)
 
-Alternatively, you can just see it on my netlify site: https://optimistic-goldwasser-86e475.netlify.app/
+Alternatively, you can just see it on my netlify site: https://dwarf-castle.netlify.app/
 
 ## How to play
 * Use arrow keys to move the dwarf around
